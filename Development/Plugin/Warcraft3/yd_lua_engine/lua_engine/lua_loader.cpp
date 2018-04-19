@@ -1,5 +1,5 @@
 #include "callback.h"
-#include "lua_helper.h"
+#include "fix_baselib.h"
 #include "lua_loader.h"
 #include "storm.h"
 #include "open_lua_engine.h"
@@ -14,48 +14,27 @@
 #include <base/hook/fp_call.h>
 #include <base/util/string_view.h>	
 #include <base/util/string_algorithm.h>
+#include <base/warcraft3/virtual_mpq.h>
 
 namespace base { namespace warcraft3 { namespace lua_engine { namespace lua_loader {
 
-	class jass_state
+	static char tmpMapName[1024] = { 0 };
+	static char curMapName[1024] = { 0 };
+	static bool init = false;
+	static lua_State* mainL = 0;
+	static lua_State* getMainL()
 	{
-	public:
-		jass_state()
-			: state_(nullptr)
-		{
-			register_game_reset_event([this](uintptr_t)
-			{
-				if (state_)
-				{
-					lua_close(state_);
-					state_ = nullptr;
-				}
-			});
-		}
-
-		lua_State* get()
-		{
-			if (!state_) {
-				state_ = initialize();
-				luaL_dostring(state_, "(require 'jass.debugger').listen('127.0.0.1', 4278)");
+		if (!mainL) {
+			lua_State* L = newstate();
+			if (L) {
+				luaL_openlibs(L);
+				open_lua_engine(L);
+				runtime::initialize();
 			}
-			return state_;
+			mainL = L;
 		}
-
-	private:
-		lua_State* initialize()
-		{
-			lua_State* L = luaL_newstate2();
-			luaL_openlibs(L);
-			open_lua_engine(L);
-			runtime::initialize();
-			return L;
-		}
-
-	private:
-		lua_State* state_; 
-	};
-	typedef singleton_nonthreadsafe<jass_state> jass_state_s;
+		return mainL;
+	}
 
 	uintptr_t RealCheat = 0;
 	void __cdecl FakeCheat(jass::jstring_t cheat_str)
@@ -78,7 +57,7 @@ namespace base { namespace warcraft3 { namespace lua_engine { namespace lua_load
 			{
 				cheat_s = cheat_s.substr(1, cheat_s.size() - 2);
 			}
-			lua_State* L = jass_state_s::instance().get();
+			lua_State* L = getMainL();
 			lua_getglobal(L, "require");
 			lua_pushlstring(L, cheat_s.data(), cheat_s.size());
 			safe_call(L, 1, 1, true);
@@ -87,10 +66,9 @@ namespace base { namespace warcraft3 { namespace lua_engine { namespace lua_load
 		c_call<uint32_t>(RealCheat, cheat_str);
 	}
 
-
 	jass::jstring_t __cdecl EXExecuteScript(jass::jstring_t script)
 	{
-		lua_State* L = jass_state_s::instance().get();
+		lua_State* L = getMainL();
 
 		std::string str_script = format("return (%s)", jass::from_trigstring(jass::from_string(script)));
 		if (luaL_loadbuffer(L, str_script.c_str(), str_script.size(), str_script.c_str()) != LUA_OK)
@@ -114,9 +92,51 @@ namespace base { namespace warcraft3 { namespace lua_engine { namespace lua_load
 		return result;
 	}
 
+	static void initialize_lua()
+	{
+		const char* buf = 0;
+		size_t      len = 0;
+		if (storm_s::instance().load_file("script\\war3map.lua", (const void**)&buf, &len))
+		{
+			lua_State* L = getMainL();
+			if (luaL_loadbuffer(L, buf, len, "@script\\war3map.lua") != LUA_OK) {
+				printf("%s\n", lua_tostring(L, -1));
+				lua_pop(L, 1);
+				storm_s::instance().unload_file(buf);
+				return;
+			}
+			safe_call(L, 0, 0, true);
+			storm_s::instance().unload_file(buf);
+		}
+		else
+		{
+			jass::table_hook("Cheat", (uintptr_t*)&RealCheat, (uintptr_t)FakeCheat);
+			jass::japi_table_add((uintptr_t)EXExecuteScript, "EXExecuteScript", "(S)S");
+		}
+	}
+
 	void initialize()
 	{
-		jass::async_hook("Cheat", (uintptr_t*)&RealCheat, (uintptr_t)FakeCheat);
-		jass::japi_add((uintptr_t)EXExecuteScript, "EXExecuteScript", "(S)S");
+		virtual_mpq::watch("war3map.j", true, [&](const std::string&, const void**, uint32_t*, uint32_t)->bool {
+			if (!storm_s::instance().get_mpq_name(tmpMapName, sizeof tmpMapName - 1)) {
+				return false;
+			}
+			if (curMapName[0] && strcmp(curMapName, tmpMapName) == 0) {
+				return false;
+			}
+			strcpy(curMapName, tmpMapName);
+			initialize_lua();
+			return false;
+		});
+
+		event_game_reset([&]()
+		{
+			if (mainL)
+			{
+				lua_close(mainL);
+				mainL = 0;
+			}
+			curMapName[0] = 0;
+		});
 	}
 }}}}

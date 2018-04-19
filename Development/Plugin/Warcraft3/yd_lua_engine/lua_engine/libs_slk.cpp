@@ -1,257 +1,260 @@
-#include "storm.h"
-#include <base/lua/make_range.h>
-#include <slk/ObjectManager.hpp>
-#include <slk/InterfaceStorm.hpp>
+#include <lua.hpp>
+#include <Windows.h>
+#include <base/path/ydwe.h>
+#include <base/util/console.h>
 
 namespace base { namespace warcraft3 { namespace lua_engine { namespace slk {
-	static int slk_object_index(lua_State* L);
-	static int slk_object_pairs(lua_State* L);
-	static int slk_create_proxy_table(lua_State* L, lua_CFunction index_func, lua_CFunction pairs_func, uintptr_t upvalue);
-}}}
 
-namespace lua
+static const char sandbox[] = R"=(
+local function standard(loaded)
+    local r = {}
+    for _, s in ipairs {
+        --'package',
+        'coroutine',
+        'table',
+        --'io',
+        'os',
+        'string',
+        'math',
+        'utf8',
+        'debug',
+    } do
+        r[s] = _G[s]
+        loaded[s] = _G[s]
+    end
+    for _, s in ipairs {
+        'assert',
+        'collectgarbage',
+        --'dofile',
+        'error',
+        'getmetatable',
+        'ipairs',
+        --'loadfile',
+        'load',
+        'next',
+        'pairs',
+        'pcall',
+        'print',
+        'rawequal',
+        'rawlen',
+        'rawget',
+        'rawset',
+        'select',
+        'setmetatable',
+        'tonumber',
+        'tostring',
+        'type',
+        'xpcall',
+        '_VERSION',
+        --'require',
+    } do
+        r[s] = _G[s]
+    end
+    return r
+end
+
+local function sandbox_env(loadlua, openfile, loaded)
+    local _LOADED = loaded or {}
+    local _E = standard(_LOADED)
+    local _PRELOAD = {}
+
+    _E.io = {
+        open = openfile,
+    }
+
+    local function searchpath(name, path)
+        local err = ''
+    	name = string.gsub(name, '%.', '/')
+    	for c in string.gmatch(path, '[^;]+') do
+            local filename = string.gsub(c, '%?', name)
+            local f = openfile(filename)
+            if f then
+                f:close()
+    			return filename
+    		end
+            err = err .. ("\n\tno file '%s'"):format(filename)
+        end
+        return nil, err
+    end
+
+    local function searcher_preload(name)
+        assert(type(_PRELOAD) == "table", "'package.preload' must be a table")
+        if _PRELOAD[name] == nil then
+            return ("\n\tno field package.preload['%s']"):format(name)
+        end
+        return _PRELOAD[name]
+    end
+    
+    local function searcher_lua(name)
+        assert(type(_E.package.path) == "string", "'package.path' must be a string")
+    	local filename, err = searchpath(name, _E.package.path)
+    	if not filename then
+    		return err
+    	end
+    	local f, err = loadlua(filename)
+    	if not f then
+    		error(("error loading module '%s' from file '%s':\n\t%s"):format(name, filename, err))
+    	end
+    	return f, filename
+    end
+
+    local function require_load(name)
+        local msg = ''
+        local _SEARCHERS = _E.package.searchers
+        assert(type(_SEARCHERS) == "table", "'package.searchers' must be a table")
+    	for _, searcher in ipairs(_SEARCHERS) do
+            local f, extra = searcher(name)
+            if type(f) == 'function' then
+                return f, extra
+            elseif type(f) == 'string' then
+                msg = msg .. f
+            end
+        end
+        error(("module '%s' not found:%s"):format(name, msg))
+    end
+
+    _E.require = function(name)
+        assert(type(name) == "string", ("bad argument #1 to 'require' (string expected, got %s)"):format(type(name)))
+    	local p = _LOADED[name]
+    	if p ~= nil then
+    		return p
+    	end
+    	local init, extra = require_load(name)
+        debug.setupvalue(init, 1, _E)
+    	local res = init(name, extra)
+    	if res ~= nil then
+    		_LOADED[name] = res
+    	end
+    	if _LOADED[name] == nil then
+    		_LOADED[name] = true
+    	end
+    	return _LOADED[name]
+    end
+    _E.package = {
+        config = [[
+            \
+            ;
+            ?
+            !
+            -
+        ]],
+        loaded = _LOADED,
+        path = '?.lua',
+        preload = _PRELOAD,
+        searchers = { searcher_preload, searcher_lua },
+        searchpath = searchpath
+    }
+    return _E
+end
+
+return function(root, io_open, loaded)
+    local function openfile(name, mode)
+        return io_open(root .. name, mode)
+    end
+    local function loadlua(name)
+        local f = openfile(name, 'r')
+        if f then
+            local str = f:read 'a'
+            f:close()
+            return load(str, '@' .. root .. name)
+        end
+    end
+    local init = loadlua('init.lua')
+    if not init then
+        return
+    end
+    debug.setupvalue(init, 1, sandbox_env(loadlua, openfile, loaded))
+	return init()
+end
+)=";
+static const char slk[] = R"=(
+local sandbox, root, loadlib, io_open = ...
+local w3x2lni = sandbox(root, io_open, {
+    ['w3xparser'] = (loadlib 'w3xparser')(),
+    ['lni']       = (loadlib 'lni')(),
+    ['lml']       = (loadlib 'lml')(),
+    ['lpeg']      = (loadlib 'lpeg')(),
+})
+local function load_mpq(filename)
+	local f = io.open(filename, "r")
+	if f then
+		local buf = f:read "a"
+		f:close()
+		return buf
+	end
+end
+local w2l = w3x2lni()
+function w2l:mpq_load(filename)
+	return load_mpq(filename)
+end
+function w2l:map_load(filename)
+	return load_mpq(filename)
+end
+return w2l:slk_lib(true, false)
+)=";
+
+static int loadlib(lua_State* L)
 {
-	template <>
-	int convert_to_lua(lua_State* L, const std::string& v)
-	{
-		lua_pushlstring(L, v.data(), v.size());
+	try {
+		size_t len = 0;
+		const char* str = luaL_checklstring(L, 1, &len);
+		std::string name(str, len);
+		fs::path path = path::ydwe(false) / "bin" / "modules" / (name + ".dll");
+		HMODULE m = LoadLibraryW(path.c_str());
+		if (!m) {
+			return 0;
+		}
+		std::string funcname = "luaopen_" + name;
+		size_t pos = funcname.find_last_of('-');
+		if (pos != std::string::npos) {
+			funcname = funcname.substr(0, pos);
+		}
+		lua_CFunction init = (lua_CFunction)GetProcAddress(m, funcname.c_str());
+		if (!init) {
+			return 0;
+		}
+		lua_pushcfunction(L, init);
 		return 1;
 	}
-
-	template <>
-	int convert_to_lua(lua_State* L, const std::string_view& v)
-	{
-		lua_pushlstring(L, v.data(), v.size());
-		return 1;
+	catch (...) {
 	}
-
-	template <>
-	int convert_to_lua(lua_State* L, const slk::SlkValue& v)
-	{
-		lua_pushstring(L, v.to_string().c_str());
-		return 1;
-	}
-
-	template <>
-	int convert_to_lua(lua_State* L, const slk::object_id& v)
-	{
-		lua_pushstring(L, v.to_string().c_str());
-		return 1;
-	}
-
-	template <>
-	int convert_to_lua(lua_State* L, const slk::SlkSingle& v)
-	{
-		warcraft3::lua_engine::slk::slk_create_proxy_table(
-			  L
-			  , warcraft3::lua_engine::slk::slk_object_index
-			  , warcraft3::lua_engine::slk::slk_object_pairs
-			  , (uintptr_t)&(v)
-			);
-		return 1;
-	}
+	return 0;
 }
 
-namespace warcraft3 { namespace lua_engine { namespace slk {
+static int io_fclose(lua_State *L) {
+	luaL_Stream *p = (luaL_Stream *)luaL_checkudata(L, 1, LUA_FILEHANDLE);
+	int res = fclose(p->f);
+	return luaL_fileresult(L, (res == 0), NULL);
+}
 
-	class slk_manager
-	{
-	public:
-		slk_manager(::slk::InterfaceStorm& storm)
-			: mgr_(storm)
-		{ }
+static int io_open(lua_State *L) {
+	const char *filename = luaL_checkstring(L, 1);
+	const char *mode = luaL_optstring(L, 2, "r");
+	luaL_argcheck(L, mode[0] == 'r' && mode[1] == '\0', 2, "invalid mode");
+	luaL_Stream *p = (luaL_Stream *)lua_newuserdata(L, sizeof(luaL_Stream));
+	luaL_setmetatable(L, LUA_FILEHANDLE);
+	p->closef = &io_fclose;
+	p->f = fopen(filename, mode);
+	return (p->f == NULL) ? luaL_fileresult(L, 0, filename) : 1;
+}
 
-		::slk::SlkTable& load(::slk::ROBJECT_TYPE::ENUM type)
-		{
-			return mgr_.load_singleton<::slk::ROBJECT_TYPE::ENUM, ::slk::SlkTable>(type);
-		}
+#define DoString(L, s, n) \
+	(luaL_loadbuffer(L, s, sizeof(s) - 1, "module '" #s "'") || (lua_insert(L, -(n)-1), lua_pcall(L, n, LUA_MULTRET, 0)))
 
-		std::string_view convert_string(const std::string_view& str)
-		{
-			return mgr_.convert_string(str);
-		}
-
-		static int destroy(lua_State* L)
-		{
-			static_cast<slk_manager*>(lua_touserdata(L, 1))->~slk_manager();
-			return 0;
-		}
-
-		static int create(lua_State* L, ::slk::InterfaceStorm& storm)
-		{
-			slk_manager* mgr = (slk_manager*)lua_newuserdata(L, sizeof(slk_manager));
-			lua_newtable(L);
-			lua_pushcclosure(L, slk_manager::destroy, 0);
-			lua_setfield(L, -2, "__gc");
-			lua_setmetatable(L, -2);
-			new (mgr)slk_manager(storm);
-			lua_setfield(L, LUA_REGISTRYINDEX, "_JASS_SLK_MGR");
-			return 0;
-		}
-
-		static slk_manager* get(lua_State* L)
-		{
-			lua_getfield(L, LUA_REGISTRYINDEX, "_JASS_SLK_MGR");
-			slk_manager* mgr = (slk_manager*)lua_touserdata(L, -1);
-			lua_pop(L, 1);
-			return mgr;
-		}
-
-	private:
-		::slk::ObjectManager  mgr_;
-	};
-
-	static int slk_table_newindex(lua_State* /*L*/)
-	{
+int open(lua_State* L)
+{
+	if (DoString(L, sandbox, 0)) {
+		printf("%s\n", lua_tostring(L, -1));
 		return 0;
 	}
-
-	static int slk_create_proxy_table(lua_State* L, lua_CFunction index_func, lua_CFunction pairs_func, uintptr_t upvalue)
-	{
-		lua_newtable(L);
-		{
-			lua_newtable(L);
-			{
-				lua_pushstring(L, "__index");
-				lua_pushinteger(L, upvalue);
-				lua_pushcclosure(L, index_func, 1);
-				lua_rawset(L, -3);
-
-				lua_pushstring(L, "__newindex");
-				lua_pushcclosure(L, slk_table_newindex, 0);
-				lua_rawset(L, -3);
-
-				lua_pushstring(L, "__pairs");
-				lua_pushinteger(L, upvalue);
-				lua_pushcclosure(L, pairs_func, 1);
-				lua_rawset(L, -3);
-			}
-			lua_setmetatable(L, -2);
-
-			lua_pushstring(L, "factory");
-			lua_pushinteger(L, upvalue);
-			lua_pushcclosure(L, pairs_func, 1);
-			lua_rawset(L, -3);
-		}
-		return 1;
-	}
-
-	static int slk_object_pairs(lua_State* L)
-	{
-		::slk::SlkSingle* object_ptr = (::slk::SlkSingle*)(uintptr_t)lua_tointeger(L, lua_upvalueindex(1));
-		return lua::make_range(L, *object_ptr);
-	}
-
-	static int slk_object_index(lua_State* L)
-	{
-		::slk::SlkSingle* object_ptr = (::slk::SlkSingle*)(uintptr_t)lua_tointeger(L, lua_upvalueindex(1));
-		const char* key = lua_tostring(L, 2);
-		auto it = object_ptr->find(key);
-		if (it == object_ptr->end())
-		{
-			lua_pushnil(L);
-			return 1;
-		}
-		return lua::convert_to_lua(L, slk_manager::get(L)->convert_string(it->second.to_string()));
-	}
-
-	static int slk_table_pairs(lua_State* L)
-	{
-		::slk::ROBJECT_TYPE::ENUM type = (::slk::ROBJECT_TYPE::ENUM)lua_tointeger(L, lua_upvalueindex(1));
-		::slk::SlkTable& table = slk_manager::get(L)->load(type);
-		return lua::make_range(L, table);
-	}
-
-	static int slk_table_index(lua_State* L)
-	{
-		::slk::ROBJECT_TYPE::ENUM type = (::slk::ROBJECT_TYPE::ENUM)lua_tointeger(L, lua_upvalueindex(1));
-		::slk::object_id id;
-
-		switch (lua_type(L, 2))
-		{
-		case LUA_TSTRING:	
-			id = ::slk::object_id(std::string_view(lua_tostring(L, 2)));
-			break;
-		case LUA_TNUMBER:	
-			id = ::slk::object_id((uint32_t)lua_tointeger(L, 2));
-			break;
-		default:
-			lua_pushnil(L);
-			return 1;
-		}
-
-		::slk::SlkTable& table = slk_manager::get(L)->load(type);
-		auto it = table.find(id);
-		if (it == table.end())
-		{
-			lua_pushnil(L);
-			return 1;
-		}
-
-		return lua::convert_to_lua(L, it->second);
-	}
-
-	static int slk_create_table(lua_State* L, const char* name, ::slk::ROBJECT_TYPE::ENUM type)
-	{
-		lua_pushstring(L, name);
-		slk_create_proxy_table(L, slk_table_index, slk_table_pairs, type);
-		lua_rawset(L, -3);
+	fs::path root = base::path::ydwe(true) / "plugin" / "w3x2lni" / "core";
+	lua_pushstring(L, (root.string() + "\\").c_str());
+	lua_pushcfunction(L, loadlib);
+	lua_pushcfunction(L, io_open);
+	if (DoString(L, slk, 4)) {
+		printf("%s\n", lua_tostring(L, -1));
 		return 0;
 	}
-
-	class slk_interface_storm
-		: public ::slk::InterfaceStorm
-	{
-	public:
-		slk_interface_storm()
-			: s_()
-		{ }
-
-		bool has(std::string const& path)
-		{
-			return s_.has_file(path.c_str());
-		}
-
-		std::string load(std::string const& path, error_code& ec)
-		{
-			const void* buf_data = nullptr;
-			size_t      buf_size = 0;
-
-			if (!s_.load_file(path.c_str(), &buf_data, &buf_size))
-			{
-				ec = ERROR_FILE_NOT_FOUND;
-				return std::move(std::string());
-			}
-			std::string result((const char*)buf_data, ((const char*)buf_data) + buf_size);
-			s_.unload_file(buf_data);
-			return std::move(result);
-		}
-
-		static slk_interface_storm& instance()
-		{
-			static slk_interface_storm storm;
-			return storm;
-		}
-
-	private:
-		storm_dll s_;
-	};
-
-	int open(lua_State* L)
-	{
-		slk_manager::create(L, slk_interface_storm::instance());
-
-		lua_newtable(L);
-		{
-			slk_create_table(L, "ability", ::slk::ROBJECT_TYPE::ABILITY);
-			slk_create_table(L, "buff", ::slk::ROBJECT_TYPE::BUFF);
-			slk_create_table(L, "unit", ::slk::ROBJECT_TYPE::UNIT);
-			slk_create_table(L, "item", ::slk::ROBJECT_TYPE::ITEM);
-			slk_create_table(L, "upgrade", ::slk::ROBJECT_TYPE::UPGRADE);
-			slk_create_table(L, "doodad", ::slk::ROBJECT_TYPE::DOODAD);
-			slk_create_table(L, "destructable", ::slk::ROBJECT_TYPE::DESTRUCTABLE);
-			slk_create_table(L, "misc", ::slk::ROBJECT_TYPE::MISC);
-		}
-		return 1;
-	}
+	return 1;
+}
 }}}}

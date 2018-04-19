@@ -50,14 +50,8 @@
     <Filter Include="base\lua">
       <UniqueIdentifier>{b74a47f0-eb1f-4c6c-9b1c-210bcabbb9d0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="base\lua\luabind">
-      <UniqueIdentifier>{6535210c-7245-4b51-af4f-870f46a6359a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="base\i18n">
       <UniqueIdentifier>{5337e579-9ee0-4e9b-807d-3339cda61c96}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="base\path\detail">
-      <UniqueIdentifier>{4f489e17-c001-4918-84f9-45d751d1b9ac}</UniqueIdentifier>
     </Filter>
     <Filter Include="base\warcraft3\jass">
       <UniqueIdentifier>{96a12d03-e58b-4f43-8c9b-5226c011e69f}</UniqueIdentifier>
@@ -80,14 +74,14 @@
     <Filter Include="base\hook\udis86">
       <UniqueIdentifier>{f23ecf6d-f199-4948-9430-68c1c5ec48c3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="base\i18n-2">
+      <UniqueIdentifier>{84787b93-89af-4757-b2f5-8507c8e7cc78}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DllMain.cpp" />
     <ClCompile Include="base\util\unicode.cpp">
       <Filter>base\util</Filter>
-    </ClCompile>
-    <ClCompile Include="base\path\service.cpp">
-      <Filter>base\path</Filter>
     </ClCompile>
     <ClCompile Include="base\win\version.cpp">
       <Filter>base\win</Filter>
@@ -121,9 +115,6 @@
     </ClCompile>
     <ClCompile Include="base\win\pe_reader.cpp">
       <Filter>base\win</Filter>
-    </ClCompile>
-    <ClCompile Include="base\hook\detail\inject_dll.cpp">
-      <Filter>base\hook\detail</Filter>
     </ClCompile>
     <ClCompile Include="base\exception\windows_exception.cpp">
       <Filter>base\exception</Filter>
@@ -178,9 +169,6 @@
     </ClCompile>
     <ClCompile Include="base\i18n\libintl.cpp">
       <Filter>base\i18n</Filter>
-    </ClCompile>
-    <ClCompile Include="base\path\detail\get_path.cpp">
-      <Filter>base\path\detail</Filter>
     </ClCompile>
     <ClCompile Include="base\warcraft3\jass\trampoline.cpp">
       <Filter>base\warcraft3\jass</Filter>
@@ -266,6 +254,18 @@
     <ClCompile Include="base\hook\patch.cpp">
       <Filter>base\hook</Filter>
     </ClCompile>
+    <ClCompile Include="base\i18n-2\gettext.cpp">
+      <Filter>base\i18n-2</Filter>
+    </ClCompile>
+    <ClCompile Include="base\hook\injectdll.cpp">
+      <Filter>base\hook</Filter>
+    </ClCompile>
+    <ClCompile Include="base\path\get_path.cpp">
+      <Filter>base\path</Filter>
+    </ClCompile>
+    <ClCompile Include="base\path\ydwe.cpp">
+      <Filter>base\path</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="base\util\detail\codecvt.h">
@@ -273,9 +273,6 @@
     </ClInclude>
     <ClInclude Include="base\util\unicode.h">
       <Filter>base\util</Filter>
-    </ClInclude>
-    <ClInclude Include="base\path\service.h">
-      <Filter>base\path</Filter>
     </ClInclude>
     <ClInclude Include="base\com\unique_ptr.h">
       <Filter>base\com</Filter>
@@ -324,9 +321,6 @@
     </ClInclude>
     <ClInclude Include="base\hook\assembler\writer.h">
       <Filter>base\hook\assembler</Filter>
-    </ClInclude>
-    <ClInclude Include="base\hook\detail\inject_dll.h">
-      <Filter>base\hook\detail</Filter>
     </ClInclude>
     <ClInclude Include="base\exception\windows_exception.h">
       <Filter>base\exception</Filter>
@@ -382,15 +376,6 @@
     <ClInclude Include="base\win\process.h">
       <Filter>base\win</Filter>
     </ClInclude>
-    <ClInclude Include="base\lua\luabind\converter_pvoid.h">
-      <Filter>base\lua\luabind</Filter>
-    </ClInclude>
-    <ClInclude Include="base\lua\luabind\converter_std_wstring.h">
-      <Filter>base\lua\luabind</Filter>
-    </ClInclude>
-    <ClInclude Include="base\lua\luabind.h">
-      <Filter>base\lua</Filter>
-    </ClInclude>
     <ClInclude Include="base\i18n\mofile.h">
       <Filter>base\i18n</Filter>
     </ClInclude>
@@ -402,9 +387,6 @@
     </ClInclude>
     <ClInclude Include="base\path\self.h">
       <Filter>base\path</Filter>
-    </ClInclude>
-    <ClInclude Include="base\path\detail\get_path.h">
-      <Filter>base\path\detail</Filter>
     </ClInclude>
     <ClInclude Include="base\warcraft3\jass\trampoline.h">
       <Filter>base\warcraft3\jass</Filter>
@@ -506,9 +488,6 @@
     <ClInclude Include="base\hook\fp_call.h">
       <Filter>base\hook</Filter>
     </ClInclude>
-    <ClInclude Include="base\lua\luabind\converter_uint32_t.h">
-      <Filter>base\lua\luabind</Filter>
-    </ClInclude>
     <ClInclude Include="base\warcraft3\command_line.h">
       <Filter>base\warcraft3</Filter>
     </ClInclude>
@@ -523,9 +502,6 @@
     </ClInclude>
     <ClInclude Include="base\util\string_view.h">
       <Filter>base\util</Filter>
-    </ClInclude>
-    <ClInclude Include="base\lua\luabind\converter_std_string_view.h">
-      <Filter>base\lua\luabind</Filter>
     </ClInclude>
     <ClInclude Include="base\win\font\file.h">
       <Filter>base\win\font</Filter>
@@ -587,9 +563,6 @@
     <ClInclude Include="base\util\optional.h">
       <Filter>base\util</Filter>
     </ClInclude>
-    <ClInclude Include="base\lua\luabind\converter_fs_path.h">
-      <Filter>base\lua\luabind</Filter>
-    </ClInclude>
     <ClInclude Include="base\lua\object.h">
       <Filter>base\lua</Filter>
     </ClInclude>
@@ -610,6 +583,21 @@
     </ClInclude>
     <ClInclude Include="base\hook\patch.h">
       <Filter>base\hook</Filter>
+    </ClInclude>
+    <ClInclude Include="base\i18n-2\lng.h">
+      <Filter>base\i18n-2</Filter>
+    </ClInclude>
+    <ClInclude Include="base\i18n-2\gettext.h">
+      <Filter>base\i18n-2</Filter>
+    </ClInclude>
+    <ClInclude Include="base\hook\injectdll.h">
+      <Filter>base\hook</Filter>
+    </ClInclude>
+    <ClInclude Include="base\path\get_path.h">
+      <Filter>base\path</Filter>
+    </ClInclude>
+    <ClInclude Include="base\path\ydwe.h">
+      <Filter>base\path</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

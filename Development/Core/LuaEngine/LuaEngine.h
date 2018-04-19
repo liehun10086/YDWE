@@ -4,22 +4,6 @@
 #include <lua.hpp>
 #include "logging.h"
 
-class LuaEngine
-{
-public:
-	LuaEngine();
-	~LuaEngine();
-	bool Initialize(const fs::path& root_path);
-	bool InitializeLogger(const fs::path& root_path);
-	bool InitializeInfo();
-	bool InitializeLua();
-	bool Uninitialize();
-	bool SetPath(fs::path const& path);
-	bool SetCPath(fs::path const& cpath);
-	bool LoadFile(fs::path const& file_path);
-
-private:
-	lua_State*              state_;
-	logging::logger*        logger_;
-	bool                    vaild_;
-};
+LUAENGINE_API lua_State* LuaEngineCreate(const wchar_t* name);
+LUAENGINE_API void       LuaEngineDestory(lua_State* L);
+LUAENGINE_API bool       LuaEngineStart(lua_State* L);

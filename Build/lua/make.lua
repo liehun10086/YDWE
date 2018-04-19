@@ -81,7 +81,7 @@ if fs.exists(path.Build / 'include'/ 'version') then
 end
 
 -- Step.4 编译
-msvc:rebuild(path.ThirdParty / 'Microsoft' / 'Detours' / 'Current' / 'sln' / 'Detours.sln', configuration)
+--msvc:rebuild(path.ThirdParty / 'Microsoft' / 'Detours' / 'sln' / 'Detours.sln', configuration)
 msvc:rebuild(path.OpenSource / 'all.sln', configuration)
 if not dev then
     msvc:rebuild(path.Development / 'Core' / 'Solution' / 'YDWE.sln', configuration)
@@ -163,7 +163,8 @@ if tonumber(msvc.version) < 150 then
 else
 	copy_ucrt_dll()
 end
-fs.copy_file(path.OpenSource / 'Lua' / 'build' / 'bin' / configuration / 'luacore.dll', path.Result / 'bin' / 'luacore.dll', true)
+fs.copy_file(path.OpenSource / 'Lua' / 'build' / 'bin' / configuration / 'lua53.dll', path.Result / 'bin' / 'lua53.dll', true)
+fs.copy_file(path.OpenSource / 'Lua' / 'build' / 'bin' / configuration / 'lua.exe', path.Result / 'bin' / 'lua.exe', true)
 fs.copy_file(path.OpenSource / 'StormLib' / 'bin' / 'Win32' / configuration / 'StormLib.dll', path.Result / 'bin' / 'StormLib.dll', true)
 fs.copy_file(path.OpenSource / 'minizip' / 'bin' / configuration / 'minizip.dll', path.Result / 'bin' / 'minizip.dll', true)
 fs.copy_file(path.OpenSource / 'luaffi' / 'bin' / configuration / 'ffi.dll', path.Result / 'bin' / 'modules' / 'ffi.dll', true)
@@ -171,13 +172,6 @@ fs.copy_file(path.OpenSource / 'lpeg' / 'bin' / configuration / 'lpeg.dll', path
 fs.copy_file(path.OpenSource / 'sfmpq' / 'bin' / configuration / 'sfmpq.dll', path.Result / 'plugin' / 'jasshelper' / 'sfmpq.dll', true)
 fs.copy_file(path.OpenSource / 'sfmpq' / 'bin' / configuration / 'sfmpq.dll', path.Result / 'plugin' / 'jasshelper' / 'bin' / 'sfmpq.dll', true)
 copy_directory(path.Development / 'Component', path.Result)
-
--- Step.6 打包皮肤
-zip(path.Development / 'Core' / 'DuiLib' / 'Resources', path.Result / 'bin' / 'skin.zip', 
-    function (file) 
-        return file:string():lower() ~= 'thumbs.db'
-    end
-)
 
 -- Step.7 复制到publish
 local ignore = { ['.pdb'] = true, ['.exp'] = true, ['.ilk'] = true, ['.aps'] = true, ['.lib'] = true, ['.ipdb'] = true, ['.iobj'] = true }

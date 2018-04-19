@@ -1,5 +1,3 @@
 LIBRARY "yd_lua_engine"
 EXPORTS
-	PluginName
 	Initialize
-	SetWindow

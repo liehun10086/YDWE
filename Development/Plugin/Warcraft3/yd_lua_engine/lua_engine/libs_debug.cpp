@@ -1,4 +1,3 @@
-#include "lua_helper.h"	  
 #include "jassbind.h" 
 #include <base/warcraft3/jass/func_value.h>	   
 #include <base/warcraft3/jass/global_variable.h>
@@ -150,9 +149,9 @@ namespace base { namespace warcraft3 { namespace lua_engine { namespace debug {
 		return 1;
 	}
 
-	static int gchash(lua_State* L)
+	static int gchash(lua_State* /*L*/)
 	{
-		lua_setgchash(L, 1);
+		// 已经没用了
 		return 0;
 	}
 

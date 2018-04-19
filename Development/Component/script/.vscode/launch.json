@@ -1,0 +1,25 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "附加",
+            "type": "lua",
+            "request": "attach",
+            "stopOnEntry": true,
+            "ip": "localhost",
+            "port": 4279
+        },
+        {
+            "name": "运行",
+            "type": "lua",
+            "request": "attach",
+            "stopOnEntry": true,
+            "preLaunchTask": "运行",
+            "ip": "localhost",
+            "port": 4279
+        }
+    ]
+}

@@ -1,18 +1,22 @@
-#include <Windows.h>
 #include "LuaEngine.h"
-#include <cstdint>
-#include <base/hook/fp_call.h>		 	  		
+#include <Windows.h>
+#include <stdint.h>
+#include <base/hook/fp_call.h>	  		
 #include <base/filesystem.h>
-#include <base/exception/exception.h>
 #include <base/hook/inline.h>
-#include <base/path/service.h>
 #include <base/path/self.h>
+#include <base/path/ydwe.h>
 #include <base/win/file_version.h>
-#include <base/file/stream.h>
 #include <base/util/format.h>
 #include <base/win/version.h>
 
 int luaopen_log(lua_State* L);
+
+void lua_pushwstring(lua_State* L, const std::wstring& str)
+{
+	std::string ustr = base::w2u(str, base::conv_method::replace | '?');
+	lua_pushlstring(L, ustr.data(), ustr.size());
+}
 
 uintptr_t RealLuaPcall = (uintptr_t)::GetProcAddress(::GetModuleHandleW(L"luacore.dll"), "lua_pcallk");
 int FakeLuaPcall(lua_State *L, int nargs, int nresults, int errfunc)
@@ -34,198 +38,108 @@ int FakeLuaPcall(lua_State *L, int nargs, int nresults, int errfunc)
 	return results;
 }
 
-LuaEngine::LuaEngine()
-	: state_(nullptr)
-	, logger_()
-	, vaild_(false)
-{ }
-
-LuaEngine::~LuaEngine()
+static int errorfunc(lua_State* L)
 {
-	state_ = nullptr;
-	vaild_ = false;
+	luaL_traceback(L, L, lua_tostring(L, 1), 0);
+	return 1;
 }
 
-bool LuaEngine::InitializeLogger(const fs::path& root_path)
+std::wstring str_replace(const wchar_t* str, wchar_t src, wchar_t dst)
 {
-	if (!logging::initialize(root_path.c_str(), L"ydwe"))
+	std::wstring s(str);
+	wchar_t ary_dst[] = { dst, 0 };
+	for (size_t pos = 0; (pos = s.find(src, pos)) != std::wstring::npos; pos++)
 	{
-		printf("initialize error %d\n", GetLastError());
-		return false;
+		s.replace(pos, 1, ary_dst);
 	}
-
-	logger_ = logging::get_logger("root");
-
-	LOGGING_INFO(logger_) << "------------------------------------------------------";
-
-	return true;
+	return s;
 }
 
-bool LuaEngine::InitializeInfo()
+lua_State* LuaEngineCreate(const wchar_t* name)
 {
+	fs::path ydwe = base::path::ydwe(false);
+	fs::path ydwedev = base::path::ydwe(true);
+
+	std::unique_ptr<logging::manager> mgr = std::make_unique<logging::manager>((ydwe / L"logs").c_str(), name);
+
+	logging::logger* lg = mgr->get_logger("root");
+	LOGGING_INFO(lg) << "------------------------------------------------------";
+
 	base::win::version_number vn = base::win::get_version_number();
+	LOGGING_INFO(lg) << base::format("LuaEngine %s started.", base::win::file_version(base::path::self().c_str())[L"FileVersion"]);
+	LOGGING_INFO(lg) << "Compiled at " __TIME__ ", " __DATE__;
+	LOGGING_INFO(lg) << base::format("Windows version: %d.%d.%d", vn.major, vn.minor, vn.build);
 
-	LOGGING_INFO(logger_) << base::format("YDWE Script engine %s started.", base::win::file_version(base::path::self().c_str())[L"FileVersion"]);
-	LOGGING_INFO(logger_) << "Compiled at " __TIME__ ", " __DATE__;
-	LOGGING_INFO(logger_) << base::format("Windows version: %d.%d.%d", vn.major, vn.minor, vn.build);
-
-	return true;
-}
-
-bool LuaEngine::InitializeLua()
-{
 #ifndef _DEBUG
-	base::hook::inline_install(&RealLuaPcall, (uintptr_t)FakeLuaPcall);
+	base::hook::install(&RealLuaPcall, (uintptr_t)FakeLuaPcall);
 #endif
-	state_ = luaL_newstate();
-	if (!state_)
+	lua_State* L = luaL_newstate();
+	if (!L)
 	{
-		LOGGING_FATAL(logger_) << "Could not initialize script engine. Program may not work correctly!";
-		return false;
-	}
-
-	luaL_openlibs(state_);
-	luaL_requiref(state_, "log", luaopen_log, 1);
-	lua_pop(state_, 1);
-	LOGGING_DEBUG(logger_) << "Initialize script engine successfully.";
-
-	return true;
-}
-
-bool LuaEngine::Initialize(const fs::path& root_path)
-{
-	if (vaild_)
-		return true;
-
-	if (!InitializeLogger(root_path))
-	{
-		return false;
+		LOGGING_FATAL(lg) << "Could not initialize LuaEngine. Program may not work correctly!";
+		return nullptr;
 	}
 
 	try
 	{
-		if (!InitializeInfo())
-		{
-			return false;
-		}
+		logging::set_manager(L, mgr.release());
 
-		if (!InitializeLua())
-		{
-			return false;
-		}
+		luaL_openlibs(L);
+		luaL_requiref(L, "log", luaopen_log, 1);
+		lua_pop(L, 1);
+		LOGGING_DEBUG(lg) << "Initialize LuaEngine successfully.";
 
-		LOGGING_INFO(logger_) << "Script engine startup complete.";
-		vaild_ = true;
-		return true;
+		fs::path cp = ydwe / L"bin" / L"modules" / L"?.dll";
+		lua_getglobal(L, "package");
+		lua_pushwstring(L, cp.wstring());
+		lua_setfield(L, -2, "cpath");
+		lua_pop(L, 1);
+
+		fs::path p1 = ydwedev / L"script" / "common" / L"?.lua";
+		fs::path p2 = ydwedev / L"script" / str_replace(name, L'.', L'/') / L"?.lua";
+		lua_getglobal(L, "package");
+		lua_pushwstring(L, p1.wstring() + L";" + p2.wstring());
+		lua_setfield(L, -2, "path");
+		lua_pop(L, 1);
+		return L;
 	}
 	catch (std::exception const& e)
 	{
-		LOGGING_ERROR(logger_) << "exception: " << e.what();
-		return false;
+		LOGGING_ERROR(lg) << "exception: " << e.what();
+		LuaEngineDestory(L);
+		return nullptr;
 	}
 	catch (...)
 	{
-		LOGGING_ERROR(logger_) << "unknown exception.";
-		return false;
+		LOGGING_ERROR(lg) << "unknown exception.";
+		LuaEngineDestory(L);
+		return nullptr;
 	}
 }
 
-bool LuaEngine::Uninitialize()
+void LuaEngineDestory(lua_State* L)
 {
-	if (vaild_)
-	{
-		lua_close(state_);
-		state_ = nullptr;
-		LOGGING_INFO(logger_) << "Script engine has been shut down.";
-		vaild_ = false;
+	logging::manager* mgr = logging::get_manager(L);
+	lua_close(L);
+	L = nullptr;
+	if (mgr) {
+		LOGGING_INFO(mgr->get_logger("root")) << "LuaEngine has been shut down.";
+		delete mgr;
 	}
-
-	return true;
 }
 
-struct luaerror {
-	luaerror(lua_State* l) : m_l(l) {}
-	lua_State* m_l;
-	lua_State* state() const { return m_l; }
-};
-
-bool LuaEngine::LoadFile(fs::path const& file_path)
+bool LuaEngineStart(lua_State* L)
 {
-	if (!vaild_)
+	lua_pushcfunction(L, errorfunc);
+	lua_getglobal(L, "require");
+	lua_pushstring(L, "main");
+	if (LUA_OK != lua_pcall(L, 1, 0, -3))
 	{
+		logging::manager* mgr = logging::get_manager(L);
+		LOGGING_ERROR(mgr->get_logger("root")) << "exception: " << lua_tostring(L, -1);
+		lua_pop(L, 2);
 		return false;
 	}
-
-	std::string name;
-	try {
-		name = file_path.string();
-	}
-	catch (...) {
-		name = "unknown";
-	}
-
-	try
-	{
-		std::vector<char> buffer = base::file::read_stream(file_path).read<std::vector<char>>();
-		if (luaL_loadbuffer(state_, buffer.data(), buffer.size(), name.c_str()))
-		{
-			throw luaerror(state_);
-		}
-
-		if (lua_pcall(state_, 0, LUA_MULTRET, 0))
-		{
-			throw luaerror(state_);
-		}
-
-		return true;
-	}
-	catch (luaerror const& e)
-	{
-		LOGGING_ERROR(logger_) << "exception: " << lua_tostring(e.state(), -1);
-		lua_pop(e.state(), 1);
-	}
-	catch (std::exception const& e)
-	{
-		LOGGING_ERROR(logger_) << "exception: " << e.what();
-	}
-	catch (...)
-	{
-		LOGGING_ERROR(logger_) << "unknown exception.";
-	}
-
-	return false;
-}
-
-bool LuaEngine::SetPath(fs::path const& path)
-{
-	std::string path_str;
-	try {
-		path_str = path.string();
-	}
-	catch (...) {
-		return false;
-	}
-
-	lua_getglobal(state_, "package");
-	lua_pushstring(state_, path_str.c_str());
-	lua_setfield(state_, -2, "path");
-	lua_pop(state_, 1);
-	return true;
-}
-
-bool LuaEngine::SetCPath(fs::path const& cpath)
-{
-	std::string cpath_str;
-	try {
-		cpath_str = cpath.string();
-	}
-	catch (...) {
-		return false;
-	}
-
-	lua_getglobal(state_, "package");
-	lua_pushstring(state_, cpath_str.c_str());
-	lua_setfield(state_, -2, "cpath");
-	lua_pop(state_, 1);
+	lua_pop(L, 1);
 	return true;
 }

@@ -5,9 +5,13 @@
 #include <base/warcraft3/war3_searcher.h>
 #include <base/hook/fp_call.h>
 
-namespace base { namespace warcraft3 { namespace jass { namespace nf_register {
+namespace base { namespace warcraft3 { namespace jass { 
+	void nfunction_add();
+	void nfunction_hook();
 
-	signal<void, uintptr_t> event_hook;
+	namespace nf_register {
+
+	signal<void, void>      event_hook;
 	signal<void, void>      event_add;
 	uintptr_t               thread_id          = 0;
 	uintptr_t               stat               = 0;
@@ -36,7 +40,8 @@ namespace base { namespace warcraft3 { namespace jass { namespace nf_register {
 					&& (strcmp(log_filename, "Agile.cpp") == 0))
 				{
 					stat = 0;
-					event_hook(retval);
+					event_hook();
+					nfunction_hook();
 				}
 			}
 		}
@@ -66,7 +71,8 @@ namespace base { namespace warcraft3 { namespace jass { namespace nf_register {
 					&& (strcmp(log_filename, ".\\Agile.cpp") == 0))
 				{
 					stat = 0;
-					event_hook(retval);
+					event_hook();
+					nfunction_hook();
 				}
 			}
 		}
@@ -96,7 +102,8 @@ namespace base { namespace warcraft3 { namespace jass { namespace nf_register {
 					&& (strcmp(log_filename, ".\\Agile.cpp") == 0))
 				{
 					stat = 0;
-					event_hook(retval);
+					event_hook();
+					nfunction_hook();
 				}
 			}
 		}
@@ -125,7 +132,8 @@ namespace base { namespace warcraft3 { namespace jass { namespace nf_register {
 					&& (strcmp(log_filename, "E:\\Drive1\\temp\\buildwar3x\\engine\\Source\\Agile\\Agile.cpp") == 0))
 				{
 					stat = 0;
-					event_hook(retval);
+					event_hook();
+					nfunction_hook();
 				}
 			}
 		}
@@ -139,12 +147,13 @@ namespace base { namespace warcraft3 { namespace jass { namespace nf_register {
 		{
 			if (stat == 1)
 			{
-				stat = 2;
+				stat =2;
 			}
 			else if (stat == 2)
 			{
 				stat = 3;
 				event_add();
+				nfunction_add();
 			}
 		}
 

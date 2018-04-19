@@ -63,7 +63,6 @@
     </ClCompile>
     <Link>
       <ModuleDefinitionFile>yd_lua_engine.def</ModuleDefinitionFile>
-      <AdditionalDependencies>luacore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -82,7 +81,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ModuleDefinitionFile>yd_lua_engine.def</ModuleDefinitionFile>
-      <AdditionalDependencies>luacore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -109,8 +107,8 @@
     <ClCompile Include="lua_engine\libs_selector.cpp" />
     <ClCompile Include="lua_engine\libs_slk.cpp" />
     <ClCompile Include="lua_engine\libs_storm.cpp" />
-    <ClCompile Include="lua_engine\lua_helper.cpp" />
     <ClCompile Include="lua_engine\lua_loader.cpp" />
+    <ClCompile Include="lua_engine\lua_memfile.cpp" />
     <ClCompile Include="lua_engine\open_lua_engine.cpp" />
     <ClCompile Include="lua_engine\common.cpp" />
     <ClCompile Include="lua_engine\sha_1.inl" />
@@ -127,8 +125,10 @@
     <ClInclude Include="lua_engine\common.h" />
     <ClInclude Include="lua_engine\jassbind.h" />
     <ClInclude Include="lua_engine\libs_runtime.h" />
-    <ClInclude Include="lua_engine\lua_helper.h" />
+    <ClInclude Include="lua_engine\fix_baselib.h" />
     <ClInclude Include="lua_engine\lua_loader.h" />
+    <ClInclude Include="lua_engine\lua_memfile.h" />
+    <ClInclude Include="lua_engine\lua_to_nativefunction.h" />
     <ClInclude Include="lua_engine\open_lua_engine.h" />
     <ClInclude Include="lua_engine\sha_1.h" />
     <ClInclude Include="lua_engine\storm.h" />
@@ -137,8 +137,8 @@
     <ProjectReference Include="$(YDWE)\Core\ydbase\ydbase.vcxproj">
       <Project>{75b04c07-94d9-41e7-bbfd-e67f79bff41a}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\Core\SlkLib\SlkLib.vcxproj">
-      <Project>{4affe3a0-639d-11e2-a80e-ab2baf291a2f}</Project>
+    <ProjectReference Include="..\..\..\..\OpenSource\Lua\build\lua53.vcxproj">
+      <Project>{b84f7231-16ce-41d8-8c08-7b523ff4225b}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

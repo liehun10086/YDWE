@@ -83,13 +83,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="auto_enter.cpp" />
-    <ClCompile Include="FullWindowedMode.cpp" />
     <ClCompile Include="game_status.cpp" />
-    <ClCompile Include="LockingMouse.cpp" />
     <ClCompile Include="DllMain.cpp" />
     <ClCompile Include="DllModule.cpp" />
     <ClCompile Include="war3_scores.cpp" />
-    <ClCompile Include="WideScreenSupport.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="yd_loader.def" />
@@ -97,13 +94,15 @@
   <ItemGroup>
     <ClInclude Include="auto_enter.h" />
     <ClInclude Include="DllModule.h" />
-    <ClInclude Include="FullWindowedMode.h" />
     <ClInclude Include="game_status.h" />
     <ClInclude Include="war3_packet.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="$(YDWE)\Core\ydbase\ydbase.vcxproj">
       <Project>{75b04c07-94d9-41e7-bbfd-e67f79bff41a}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\..\OpenSource\Lua\build\lua53.vcxproj">
+      <Project>{b84f7231-16ce-41d8-8c08-7b523ff4225b}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

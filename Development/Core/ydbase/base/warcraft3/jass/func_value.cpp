@@ -212,7 +212,6 @@ namespace base { namespace warcraft3 { namespace jass {
 		{
 			return false;
 		}
-
 		return japi_function.insert(std::make_pair(proc_name, func_value(*nf, new_proc))).second;
 	}
 
@@ -221,15 +220,9 @@ namespace base { namespace warcraft3 { namespace jass {
 		return japi_function.insert(std::make_pair(proc_name, func_value(param, new_proc))).second;
 	}
 
-	bool japi_func_remove(const char* proc_name)
+	bool japi_func_clean()
 	{
-		auto it = japi_function.find(proc_name);
-		if (it != japi_function.end())
-		{
-			japi_function.erase(it);
-			return true;
-		}
-
-		return false;
+		japi_function.clear();
+		return true;
 	}
 }}}

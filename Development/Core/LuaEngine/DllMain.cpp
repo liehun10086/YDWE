@@ -1,10 +1,25 @@
 #include <Windows.h>
-#include <locale>						  		
-#include <base/filesystem.h>
-#include <base/path/self.h>
-#include "../LuaEngine/LuaEngine.h"
+#include <locale>
+#include <array>
+#include <base/util/dynarray.h>
+#include "LuaEngine.h"
 
-LuaEngine gLuaEngine;
+lua_State* L = nullptr;
+
+std::wstring getenv(const wchar_t* varname)
+{
+	std::array<wchar_t, 4096> sbuf;
+	DWORD r = GetEnvironmentVariableW(varname, sbuf.data(), sbuf.size());
+	if (r <= sbuf.size()) {
+		return std::wstring(sbuf.data(), r);
+	}
+	std::dynarray<wchar_t> dbuf(r);
+	r = GetEnvironmentVariableW(varname, dbuf.data(), dbuf.size());
+	if (r) {
+		return std::wstring(dbuf.data(), r);
+	}
+	return std::wstring();
+}
 
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID pReserved)
 {
@@ -15,19 +30,10 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID pReserved)
 		try
 		{
 			std::locale::global(std::locale("", LC_CTYPE));
-			fs::path root_path = base::path::self().remove_filename().remove_filename();
-			if (gLuaEngine.Initialize(root_path / L"logs"))
-			{
-				gLuaEngine.SetCPath(root_path / L"bin" / L"modules" / L"?.dll");
-				fs::path dev_script = root_path.parent_path().remove_filename().remove_filename() / L"Component" / L"share" / L"script";
-				if (fs::exists(dev_script)) {
-					gLuaEngine.SetPath(dev_script / L"?.lua");
-					gLuaEngine.LoadFile(dev_script / L"YDWE.lua");
-				}
-				else {
-					gLuaEngine.SetPath(root_path / L"share" / L"script" / L"?.lua");
-					gLuaEngine.LoadFile(root_path / L"share" / L"script" / L"YDWE.lua");
-				}
+			std::wstring name = getenv(L"ydwe-process-name");
+			L = LuaEngineCreate(name.c_str());
+			if (L) {
+				LuaEngineStart(L);
 			}
 		}
 		catch (...)
@@ -37,7 +43,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID pReserved)
 	}
 	else if (reason == DLL_PROCESS_DETACH)
 	{
-		gLuaEngine.Uninitialize();
+		if (L) LuaEngineDestory(L);
 	}
 
 	return TRUE;

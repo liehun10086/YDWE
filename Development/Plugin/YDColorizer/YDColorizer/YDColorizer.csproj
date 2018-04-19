@@ -63,14 +63,6 @@
     <CodeAnalysisRuleDirectories>;D:\Program Files\Microsoft Visual Studio 10.0\Team Tools\Static Analysis Tools\FxCop\\Rules</CodeAnalysisRuleDirectories>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Deployment" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
     <Compile Include="AboutConfig.cs" />
     <Compile Include="AboutProcess.cs" />
     <Compile Include="ColorPicker.cs">
@@ -93,24 +85,27 @@
       <DependentUpon>GetScreenColorForm.cs</DependentUpon>
     </Compile>
     <Compile Include="GlobalException.cs" />
-    <Compile Include="Ini.cs" />
     <Compile Include="MyRichTextBox.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="MyTextBox.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SettingForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="SettingForm.Designer.cs">
-      <DependentUpon>SettingForm.cs</DependentUpon>
-    </Compile>
     <Compile Include="TextConvert.cs" />
     <Compile Include="UserCustomColor.cs" />
     <Compile Include="WEInit.cs" />
+    <Compile Include="winapi\Button.cs" />
+    <Compile Include="winapi\ComboBox.cs" />
+    <Compile Include="winapi\Ini.cs" />
+    <Compile Include="winapi\KeyBoard.cs" />
+    <Compile Include="winapi\Label.cs" />
+    <Compile Include="winapi\ListBox.cs" />
+    <Compile Include="winapi\ListView.cs" />
+    <Compile Include="winapi\Mouse.cs" />
+    <Compile Include="winapi\Screen.cs" />
+    <Compile Include="winapi\TextBox.cs" />
+    <Compile Include="winapi\Window.cs" />
     <EmbeddedResource Include="ColorPicker.resx">
       <DependentUpon>ColorPicker.cs</DependentUpon>
     </EmbeddedResource>
@@ -124,9 +119,6 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <SubType>Designer</SubType>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-    <EmbeddedResource Include="SettingForm.resx">
-      <DependentUpon>SettingForm.cs</DependentUpon>
     </EmbeddedResource>
     <None Include="app.config" />
     <None Include="Properties\Settings.settings">
@@ -182,13 +174,13 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\WinApi\WinApi.csproj">
-      <Project>{09887719-7928-45E8-A2AD-D97E2C379630}</Project>
-      <Name>WinApi</Name>
-    </ProjectReference>
+    <EmbeddedResource Include="Resources\icoSetting.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\icoSetting.png" />
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

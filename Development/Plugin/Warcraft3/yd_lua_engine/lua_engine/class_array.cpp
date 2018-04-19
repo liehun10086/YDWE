@@ -1,5 +1,4 @@
 #include "class_array.h"
-#include "lua_helper.h"
 #include "jassbind.h"
 #include "common.h"
 #include <base/warcraft3/jass/global_variable.h>
@@ -78,11 +77,7 @@ namespace base { namespace warcraft3 { namespace lua_engine {
 		};
 	
 		luaL_newmetatable(L, LUA_JASS_ARRAY);
-#if LUA_VERSION_NUM >= 502
 		luaL_setfuncs(L, lib, 0);
 		lua_pop(L, 1);
-#else
-		luaL_register(L, NULL, lib);
-#endif
 	}
 }}}

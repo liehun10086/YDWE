@@ -1,4 +1,6 @@
-#include "lua_helper.h"
+#pragma once
+
+#include <lua.hpp>
 #include "jassbind.h"
 #include <base/warcraft3/jass/func_value.h>
 

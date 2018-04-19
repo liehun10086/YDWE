@@ -4,12 +4,15 @@
 #include <base/filesystem.h>
 
 //#define YDWE_BASE_INLINE
-#include <base/path/service.h>
+#include <base/path/get_path.h>
+#include <base/path/helper.h>
+#include <base/path/ydwe.h>
 #include <base/util/unicode.h>	
 #include <base/lua/make_range.h>
 
 #if defined(YDWE_BASE_INLINE)
 #include <base/path/service.cpp>
+#include <base/path/helper.cpp>
 #include <base/path/detail/get_path.cpp>
 #include <base/util/unicode.cpp>
 #include <base/exception/exception.cpp>
@@ -277,7 +280,13 @@ namespace luafs {
 			FS_TRY;
 			const fs::path& self = path::to(L, 1);
 			const fs::path& rht = path::to(L, 2);
-			lua_pushboolean(L, fs::equivalent(self, rht));
+			std::error_code ec;
+			bool r = fs::equivalent(self, rht, ec);
+			if (ec) {
+				lua_pushboolean(L, r);
+				return 1;
+			}
+			lua_pushboolean(L, base::path::equal(self, rht));
 			return 1;
 			FS_TRY_END;
 		}
@@ -407,13 +416,26 @@ namespace luafs {
 	static int canonical(lua_State* L)
 	{
 		FS_TRY;
-		const fs::path& p = path::to(L, 1);;
+		const fs::path& p = path::to(L, 1);
 		if (lua_gettop(L) == 1) {
 			return path::constructor_(L, std::move(fs::canonical(p)));
 		}
 		const fs::path& base = path::to(L, 2);
 		return path::constructor_(L, std::move(fs::canonical(p, base)));
-		return 0;
+		FS_TRY_END;
+	}
+
+	static int uncomplete(lua_State* L)
+	{
+		FS_TRY;
+		const fs::path& p = path::to(L, 1);
+		const fs::path& base = path::to(L, 2);
+		std::error_code ec;
+		fs::path result  = base::path::uncomplete(p, base, ec);
+		if (ec) {
+			throw fs::filesystem_error("uncomplete(p1, p2): invalid arguments");
+		}
+		return path::constructor_(L, std::move(result));
 		FS_TRY_END;
 	}
 
@@ -432,6 +454,13 @@ namespace luafs {
 		FS_TRY;
 		lua_Integer option = luaL_checkinteger(L, 1);
 		return path::constructor_(L, std::move(base::path::get(base::path::PATH_TYPE(option))));
+		FS_TRY_END;
+	}
+
+	static int ydwe(lua_State* L)
+	{
+		FS_TRY;
+		return path::constructor_(L, std::move(base::path::ydwe(lua_toboolean(L, 1))));
 		FS_TRY_END;
 	}
 }
@@ -466,6 +495,7 @@ int luaopen_filesystem(lua_State* L)
 		{ "__eq", luafs::path::mt_eq },
 		{ "__gc", luafs::path::destructor },
 		{ "__tostring", luafs::path::mt_tostring },
+		{ "__debugger_tostring", luafs::path::mt_tostring },
 		{ NULL, NULL }
 	};
 	luaL_newmetatable(L, "filesystem");
@@ -486,8 +516,10 @@ int luaopen_filesystem(lua_State* L)
 		{ "copy_file", luafs::copy_file },
 		{ "absolute", luafs::absolute },
 		{ "canonical", luafs::canonical },
+		{ "uncomplete", luafs::uncomplete },
 		{ "last_write_time", luafs::last_write_time },
 		{ "get", luafs::get },
+		{ "ydwe", luafs::ydwe },
 		{ NULL, NULL }
 	};	
 	lua_newtable(L);

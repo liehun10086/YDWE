@@ -1,16 +1,18 @@
 ﻿#include <base/filesystem.h>
 #include <base/file/stream.h>
-#include <base/path/service.h>
+#include <base/path/get_path.h>
+#include <base/path/ydwe.h>
 #include <base/path/helper.h>
 #include <base/win/env_variable.h>
 #include <base/win/process.h>
 #include <base/util/ini.h>
+#include <base/util/format.h>
 #include <base/warcraft3/directory.h>
 #include <base/warcraft3/command_line.h>
 #include <base/win/registry/key.h> 
 #include <base/hook/fp_call.h>
 
-std::wstring get_test_map_path()
+static std::wstring get_test_map_path()
 {
 	std::wstring result = L"Maps\\Test\\WorldEditTestMap";
 	try {
@@ -20,7 +22,7 @@ std::wstring get_test_map_path()
 	return std::move(result);
 }
 
-bool launch_taskbar_support(const fs::path& ydwe_path)
+static bool launch_taskbar_support(const fs::path& ydwe_path)
 {
 	HMODULE hdll = LoadLibraryW((ydwe_path / L"plugin" / L"YDTaskbarSupport.dll").c_str());
 	if (hdll)
@@ -35,21 +37,95 @@ bool launch_taskbar_support(const fs::path& ydwe_path)
 	return false;
 }
 
+static bool is_lnimap(const fs::path& from)
+{
+	bool res = false;
+	FILE* f = 0;
+	if (_wfopen_s(&f, from.c_str(), L"rb") == 0 && f) {
+		fseek(f, 8, SEEK_SET);
+		uint32_t mark = 0;
+		if (1 == fread(&mark, sizeof mark, 1, f) && mark == '\1L2W') {
+			res = true;
+		}
+		fclose(f);
+	}
+	return res;
+}
+
+static bool map_convert(const fs::path& ydwe, const fs::path& from, const fs::path& to, const char* mode)
+{
+	fs::path ydwedev = base::path::ydwe(true);
+	fs::path app = ydwe / L"bin" / L"lua.exe";
+	base::win::process process;
+	process.set_console(base::win::process::CONSOLE_DISABLE);
+	process.set_env(L"PATH", (ydwe / L"bin").wstring());
+	if (!process.create(
+		app,
+		base::format(LR"("%s" -e "package.cpath = [[%s]]" gui\mini.lua -%s -config="%s" "%s" "%s")", 
+			app.wstring(), 
+			(ydwe / L"bin" / L"modules" / L"?.dll").wstring(),
+			mode,
+			(ydwedev / L"script"/ L"war3"/ L"w3x2lni.ini").wstring(),
+			from.wstring(),
+			to.wstring()
+		),
+		ydwedev / L"plugin" / L"w3x2lni"
+	)) {
+		return false;
+	}
+	return process.wait() == 0;
+}
+
+static void map_build(const fs::path& ydwe, const fs::path& from, const fs::path& to, bool slk)
+{
+	if (is_lnimap(from)) {
+		if (slk) {
+			if (!map_convert(ydwe, from, to, "slk")) {
+				// TODO: ERROR
+				fs::copy_file(from, to, fs::copy_options::overwrite_existing);
+			}
+		}
+		else {
+			if (!map_convert(ydwe, from, to, "obj")) {
+				// TODO: ERROR
+				fs::copy_file(from, to, fs::copy_options::overwrite_existing);
+			}
+		}
+	}
+	else {
+		if (slk) {
+			if (!map_convert(ydwe, from, to, "slk")) {
+				fs::copy_file(from, to, fs::copy_options::overwrite_existing);
+			}
+		}
+		else {
+			fs::copy_file(from, to, fs::copy_options::overwrite_existing);
+		}
+	}
+}
+
 bool launch_warcraft3(base::warcraft3::command_line& cmd)
 {
 	try {
-		fs::path ydwe_path = base::path::get(base::path::DIR_EXE).remove_filename();
-		launch_taskbar_support(ydwe_path);
-
-		//base::win::env_variable ev(L"PATH");
-		//std::wstring p;
-		//p += (ydwe_path / L"bin").c_str();    p += L";"; 
-		//ev.set(p + ev.get());
+		fs::path ydwe = base::path::ydwe(false);
+		launch_taskbar_support(ydwe);
 
 		fs::path war3_path;
 		if (!base::warcraft3::directory::get(nullptr, war3_path))
 		{
 			return false;
+		}
+
+		base::ini::table table;
+		table["MapTest"]["LaunchRenderingEngine"] = "Direct3D 8";
+		table["MapTest"]["LaunchWindowed"] = "1";
+		table["MapTest"]["UserName"] = "";
+		table["MapTest"]["EnableMapSlk"] = "0";
+		try {
+			auto buf = base::file::read_stream(ydwe / L"bin" / L"EverConfig.cfg").read<std::string>();
+			base::ini::read(table, buf.c_str());
+		}
+		catch (...) {
 		}
 
 		//
@@ -66,12 +142,11 @@ bool launch_warcraft3(base::warcraft3::command_line& cmd)
 			{
 				fs::path test_map_path = get_test_map_path() + loadfile.extension().wstring();
 				try {
-#if _MSC_VER >= 1910
-					fs::copy_file(loadfile, war3_path / test_map_path, fs::copy_options::overwrite_existing);
-#else
-					fs::copy_file(loadfile, war3_path / test_map_path, fs::copy_option::overwrite_if_exists);
-#endif
 					cmd[L"loadfile"] = test_map_path.wstring();
+					if (!loadfile.is_absolute()) {
+						loadfile = war3_path / loadfile;
+					}
+					map_build(ydwe, loadfile, war3_path / test_map_path, "0" != table["MapTest"]["EnableMapSlk"]);
 				}
 				catch (...) {
 				}
@@ -79,18 +154,8 @@ bool launch_warcraft3(base::warcraft3::command_line& cmd)
 		}
 
 		war3_path = war3_path / L"war3.exe";
-		fs::path inject_dll = ydwe_path / L"plugin" / L"warcraft3" / L"yd_loader.dll";
+		fs::path inject_dll = ydwe / L"bin" / L"LuaEngine.dll";
 
-		base::ini::table table;
-		table["MapTest"]["LaunchRenderingEngine"]   = "Direct3D 8";
-		table["MapTest"]["LaunchWindowed"] = "1";
-		table["MapTest"]["UserName"] = "";
-		try {
-			auto buf = base::file::read_stream(ydwe_path / L"bin" / L"EverConfig.cfg").read<std::string>();
-			base::ini::read(table, buf.c_str());
-		} 
-		catch (...) {
-		}
 		std::string name = table["MapTest"]["UserName"];
 		if (name != "")
 		{
@@ -109,12 +174,14 @@ bool launch_warcraft3(base::warcraft3::command_line& cmd)
 		}
 
 
+		SetEnvironmentVariableW(L"ydwe-process-name", L"war3");
+
 		base::win::process warcraft3_process;
 
 		try {
 			if (table["War3Patch"]["Option"] == "2")
 			{
-				fs::path stormdll = ydwe_path / L"share" / L"patch" / table["War3Patch"]["DirName"] / L"Storm.dll";
+				fs::path stormdll = ydwe / L"share" / L"patch" / table["War3Patch"]["DirName"] / L"Storm.dll";
 				if (fs::exists(stormdll))
 				{
 					warcraft3_process.replace(stormdll, "Storm.dll");
@@ -126,8 +193,8 @@ bool launch_warcraft3(base::warcraft3::command_line& cmd)
 
 		if (fs::exists(inject_dll))
 		{
-			cmd.add(L"ydwe", ydwe_path.wstring());
-			warcraft3_process.inject(inject_dll);			
+			cmd.add(L"ydwe", ydwe.wstring());
+			warcraft3_process.inject_x86(inject_dll);			
 		}
 
 		cmd.app(war3_path.wstring());

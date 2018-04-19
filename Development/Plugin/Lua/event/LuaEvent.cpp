@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <functional>
 #include <regex>
-#include <base/path/service.h>
+#include <base/path/get_path.h>
 #include <base/util/unicode.h>
 #include <base/hook/inline.h>
 #include <base/hook/iat.h>
@@ -18,6 +18,8 @@
 #include <Mss.h>
 
 namespace NYDWE {
+
+	HFONT font = NULL;
 
 	void lua_pushwstring(lua_State* L, const std::wstring& str)
 	{
@@ -41,7 +43,6 @@ namespace NYDWE {
 	int32_t WINAPI DetourWeWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int32_t showCommand)
 	{
 		LOGGING_INFO(lg) << "Entering main program.";
-		LOGGING_DEBUG(lg) << "Command line: " << (commandLine ? commandLine : "NULL");
 
 		// Initialize COM	   
 		base::com::guard com;
@@ -196,6 +197,9 @@ namespace NYDWE {
 	uintptr_t pgTrueWeWindowProc;
 	LRESULT CALLBACK DetourWeWindowProc(HWND windowHandle, UINT message, WPARAM wParam, LPARAM lParam)
 	{
+		if (message != WM_COMMAND) {
+			return base::std_call<LRESULT>(pgTrueWeWindowProc, windowHandle, message, wParam, lParam);
+		}
 		int results = event_array[EVENT_WINDOW_MESSAGE]([&](lua_State* L, int idx){
 			lua_pushstring(L, "handle");
 			lua_pushinteger(L, (lua_Integer)windowHandle);
@@ -236,11 +240,14 @@ namespace NYDWE {
 			lpParam
 			);
 
-		if (strcmp("Warcraft III", lpClassName) == 0)
-		{
-			gWeMainWindowHandle = result;
+		if (result) {
+			if (strcmp("Warcraft III", lpClassName) == 0) {
+				gWeMainWindowHandle = result;
+			}
+			if (font) {
+				::PostMessage(result, WM_SETFONT, (WPARAM)(HFONT)(font), (LPARAM)(BOOL)(0));
+			}
 		}
-
 		return result;
 	}
 
@@ -393,7 +400,7 @@ namespace NYDWE {
 		return base::std_call<HPROVIDER>(pgTrueMssRIBLoadProviderLibrary, fileName);
 	}
 
-#define INSTALL_INLINE_HOOK(name) if (!is##name##HookInstalled) { if (pgTrue##name##) { is##name##HookInstalled = base::hook::inline_install(&pgTrue##name##, (uintptr_t)Detour##name##); }}
+#define INSTALL_INLINE_HOOK(name) if (!is##name##HookInstalled) { if (pgTrue##name##) { is##name##HookInstalled = base::hook::install(&pgTrue##name##, (uintptr_t)Detour##name##); }}
 
 	void SetupEvent()
 	{
